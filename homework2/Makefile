@@ -1,4 +1,4 @@
-all: homework1
+all: homework2
 
 install:
 	cd build && make install
@@ -6,7 +6,7 @@ install:
 uninstall:
 	cd build && make uninstall
 
-homework1:
+homework2:
 	@mkdir -p build
 	-mkdir -p bin
 	cd build && cmake $(CMAKE_FLAGS) ..
