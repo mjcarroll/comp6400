@@ -20,6 +20,7 @@ namespace person {
         void draw();
         void move(bool direction);
         void rotate(bool direction);
+        void scale(bool direction);
         
     private:
         GLint x_, y_, angle_;

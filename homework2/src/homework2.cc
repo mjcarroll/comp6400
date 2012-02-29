@@ -34,25 +34,33 @@ void myInit()
 
 void display() {
 	glClear(GL_COLOR_BUFFER_BIT);
-    
+
     glLoadIdentity();
     glTranslatef(20.0, 0, 0);
     sc->draw();
-    
+
     glLoadIdentity();
     pp->draw();
-    
+
     glutSwapBuffers();
 }
 
+/* Handle the majority of keyboard keys */
 void keyboard(unsigned char key, int x, int y)
 {
     switch(key){
+        /* The minus key will scale down */
+        case 45: pp->scale(false); break;
+        /* The '=' key will scale up */
+        case 61: pp->scale(true); break;
+        /* ESC exits */
         case 27: exit(0); break;
-        default: printf("   Keyboard %c == %d\n", key, key);
+        default: printf("   Keyboard %c == %d\n", key, key); break;
     }
+    glutPostRedisplay();
 }
 
+/* Handle the special keys */
 void keyboardSpecial(int key, int x, int y)
 {
     switch (key) {
@@ -74,14 +82,14 @@ int main(int argc, char *argv[]) {
 	glutInitWindowPosition(0,0);
 
 	glutCreateWindow("COMP-5/6400 Assignment 2");
-    
+
 	glutDisplayFunc(display);
-    
+
     glutKeyboardFunc(keyboard);
     glutSpecialFunc(keyboardSpecial);
-    
+
     myInit();
 	glutMainLoop();
-    
+
     return 0;
 }

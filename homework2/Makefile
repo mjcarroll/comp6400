@@ -18,4 +18,4 @@ endif
 
 clean:
 	-cd build && make clean
-	rm -rf build bin lib
+	rm -rf build bin lib obj
