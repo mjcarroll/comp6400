@@ -1,4 +1,4 @@
-all: homework3
+all: homework1
 
 install:
 	cd build && make install
@@ -6,7 +6,7 @@ install:
 uninstall:
 	cd build && make uninstall
 
-homework3:
+homework1:
 	@mkdir -p build
 	-mkdir -p bin
 	cd build && cmake $(CMAKE_FLAGS) ..
@@ -18,4 +18,4 @@ endif
 
 clean:
 	-cd build && make clean
-	rm -rf build bin lib obj
+	rm -rf build bin lib
