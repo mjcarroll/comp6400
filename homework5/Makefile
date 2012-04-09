@@ -1,4 +1,4 @@
-all: homework4
+all: homework5
 
 install:
 	cd build && make install
@@ -15,7 +15,7 @@ ifneq ($(MAKE),)
 else
 	cd build && make
 endif
-	bin/homework4
+	bin/homework5
 
 clean:
 	-cd build && make clean

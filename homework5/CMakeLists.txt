@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 2.6)
-project(homework4)
+project(homework5)
 
 set(EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/bin)
 set(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
@@ -14,9 +14,8 @@ endif(NOT OPENGL_FOUND)
 
 find_package(GLUT REQUIRED)
 
-
 include_directories(${OPENGL_INCLUDE_DIR} ${GLUT_INCLUDE_DIR})
 
 # Homework 4
-add_executable(homework4 src/main.cc)
-target_link_libraries(homework4 ${OPENGL_LIBRARIES} ${GLUT_LIBRARIES})
+add_executable(homework5 src/main.cc)
+target_link_libraries(homework5 ${OPENGL_LIBRARIES} ${GLUT_LIBRARIES})
