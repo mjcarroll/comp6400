@@ -80,44 +80,38 @@
 #include <cstring>
 using namespace std;
 
-
 #if !defined(GLUT_WHEEL_UP)
 #  define GLUT_WHEEL_UP   3
 #  define GLUT_WHEEL_DOWN 4
 #endif
 
-typedef struct
-{
+typedef struct {
 	float x;
 	float y;
 	float z;
 }
 Vector;
 
-typedef struct
-{
+typedef struct {
 	float r;
 	float g;
 	float b;
 }
-Colour;
+Color;
 
-typedef struct
-{
+typedef struct {
 	int v1, v2, v3;
 	int vn1, vn2, vn3;
 	int vt1, vt2, vt3;
 }
 Face;
 
-typedef struct
-{
+typedef struct {
 	float u, v;
 }
 TexCoord;
 
-typedef struct
-{
+typedef struct {
 	float Ka[3];
 	float Kd[3];
 	float Ks[3];
@@ -125,8 +119,7 @@ typedef struct
 }
 Material;
 
-class WFObject
-{
+class WFObject {
 	private:
 		// Dynamic variables to keep our object data in
 		vector<Vector> vertices;
@@ -141,291 +134,249 @@ class WFObject
 		// Index of current material being used for the verticies _et al_ succeeding the `usemtl` line
 		int materialIndex;
 
-		void parseLine(char *line);
+        void parseLine(char *line){
+            //char *lineType;
+            // Copy type string to type char[] for strtok()
+            //lineType = strtok(lineStr, " ");
+            if(!strlen(line))
+            {
+                return;
+            }
+            char *lineType;
+            lineType = strtok(strdup(line), " ");
+            // Decide what to do
+            if(!strcmp(lineType, "v"))      // Vertex
+            {
+                parseVertex(line);
+            }
+            else if(!strcmp(lineType, "vn"))    // Normal
+            {
+                parseNormal(line);
+            }
+            else if(!strcmp(lineType, "f")) // Face
+            {
+                parseFace(line);
+            }
+            else if(!strcmp(lineType, "mtllib"))        // Material library (file)
+            {
+                char fileName[255];
+                sscanf(line, "mtllib %s", &fileName);
+                if(strlen(fileName))
+                {
+                    loadMaterials(fileName);
+                }
+                else
+                {
+                    cout << "Parse error" << endl;
+                }
+            }
+            else if(!strcmp(lineType, "usemtl"))        // Use a material from the materials library
+            {
+                string mtlName;
+                materialIndex++;
+                sscanf(line, "usemtl %s", mtlName.c_str());
+                parseMaterial(mtlName.c_str());
+                faces.push_back(vector<Face>());
+            }
+            return;
+        }
 
-		void parseVertex(char *line);
-		void parseNormal(char *line);
-		void parseFace(char *line);
+        void parseVertex(char *line) {
+            vertices.push_back(Vector());       // Add a new element to the vertices array
+            sscanf(line, "v %f %f %f", &vertices.back().x, &vertices.back().y, &vertices.back().z);
+            return;
+        }
 
-		int loadMaterials(char *filename);
-		void parseMaterial(string line);
+        // Parse a "vn" normal line of the file into the normals array
+        void parseNormal(char *line) {
+            normals.push_back(Vector());
+            sscanf(line, "vn %f %f %f", &normals.back().x, &normals.back().y, &normals.back().z);
+            return;
+        }
+
+
+        // Parse a "f" face line into the faces array. This gets complex due to there being different line formats.
+        void parseFace(char *line) {
+            //Face tmp; // Temporary storage for our face
+            faces[materialIndex].push_back(Face());
+            // Read face line. If texture indicies aren't present, don't read them.
+            if(sscanf(line, "f %d//%d %d//%d %d//%d",
+                              &faces[materialIndex].back().v1,
+                              &faces[materialIndex].back().vn1,
+                              &faces[materialIndex].back().v2,
+                              &faces[materialIndex].back().vn2,
+                              &faces[materialIndex].back().v3,
+                              &faces[materialIndex].back().vn3) <= 1)
+            {
+                sscanf(line, "f %d/%d/%d %d/%d/%d %d/%d/%d",
+                             &faces[materialIndex].back().v1,
+                             &faces[materialIndex].back().vt1,
+                             &faces[materialIndex].back().vn1,
+                             &faces[materialIndex].back().v2,
+                             &faces[materialIndex].back().vt2,
+                             &faces[materialIndex].back().vn2,
+                             &faces[materialIndex].back().v3,
+                             &faces[materialIndex].back().vt3,
+                             &faces[materialIndex].back().vn3);
+            }
+            return;
+        }
+
+		// Open .mtl file and save into memory
+        int loadMaterials(char *filename) {
+            fstream file;
+            file.open(filename);
+            if(file.is_open())
+            {
+                char line[255];
+                // Parse material file
+                while(file.good())
+                {
+                    file.getline(line, 255);
+                    mtlFile.push_back(line);
+                }
+            }
+            else
+            {
+                cout << "Could not open mtl file '" << filename << "'\n";
+                return false;
+            }
+            file.close();
+            return true;
+        }
+
+        // Search .mtl file in memory for the material we want. Load that materials properties into the materials
+        // array.
+        void parseMaterial(string mtlName) {
+            string materialName;
+            char *line = new char[255];
+            bool mtlFound = false;
+            for(int i = 0; i < mtlFile.size(); i++)
+            {
+                strncpy(line, mtlFile[i].c_str(), 255);
+                if(strlen(line))
+                {
+                    if(sscanf(line, "newmtl %s", materialName.c_str()))
+                    {
+                        if(mtlFound)
+                        {
+                            return;
+                        }
+                        if(!strcmp(mtlName.c_str(), materialName.c_str()))
+                        {
+                            mtlFound = true;    // Set the "found material" flag to true
+                            materials.push_back(Material());
+                        }
+                    }
+                    if(mtlFound)
+                    {
+                        // Parse this line into a material
+                        if(line[0] == 'N' && line[1] == 's')
+                        {
+                            sscanf(line, "Ns %f", &materials.back().Ns);
+                        }
+                        else if(line[0] == 'K' && line[1] == 'a')
+                        {
+                            sscanf(line, "Ka %f %f %f",
+                                &materials.back().Ka[0],
+                                &materials.back().Ka[1],
+                                &materials.back().Ka[2]);
+                        }
+                        else if(line[0] == 'K' && line[1] == 'd')
+                        {
+                            sscanf(line, "Kd %f %f %f",
+                                &materials.back().Kd[0],
+                                &materials.back().Kd[1],
+                                &materials.back().Kd[2]);
+                        }
+                        else if(line[0] == 'K' && line[1] == 's')
+                        {
+                            sscanf(line, "Ks %f %f %f",
+                                &materials.back().Ks[0],
+                                &materials.back().Ks[1],
+                                &materials.back().Ks[2]);
+                        }
+                    }
+                }
+                else
+                {
+                    return;
+                }
+            }
+
+            return;
+        }
 
 	public:
-		WFObject();
-		~WFObject();
+        WFObject() {
+            materialIndex = -1;     // Material index starts from zero
+        }
 
-		int load(char *filename);
-		void draw();
+        ~WFObject() {}
+
+        int load(const char* filename) {
+            fstream objFile;
+            objFile.open(filename);
+            if(objFile.is_open())
+            {
+                char line[255];
+                // Parse object file line by line
+                while(objFile.good())
+                {
+                    objFile.getline(line, 255);
+                    parseLine(line);
+                }
+                objFile.close();
+            }
+            else
+            {
+                cout << "Could not open WFObject file '" << filename << "'\n";
+                return false;
+            }
+            return true;
+        }
+
+        // Draw object
+        void draw() {
+            for(int g = 0; g < faces.size(); g++)
+            {
+                // Apply material for this material group
+                glMaterialfv(GL_FRONT, GL_SPECULAR, materials[g].Ks);
+                glMaterialfv(GL_FRONT, GL_DIFFUSE, materials[g].Kd);
+                glMaterialfv(GL_FRONT, GL_AMBIENT, materials[g].Ka);
+                glMaterialf(GL_FRONT, GL_SHININESS, materials[g].Ns);
+                glBegin(GL_TRIANGLES);
+                for(int f = 0; f < faces[g].size(); f++)
+                {
+                    glNormal3f(normals[faces[g][f].vn1 - 1].x,
+                                normals[faces[g][f].vn1 - 1].y,
+                                normals[faces[g][f].vn1 - 1].z);
+                    glVertex3f(vertices[faces[g][f].v1 - 1].x,
+                                vertices[faces[g][f].v1 - 1].y,
+                                vertices[faces[g][f].v1 - 1].z);
+                    glNormal3f(normals[faces[g][f].vn2 - 1].x,
+                                normals[faces[g][f].vn2 - 1].y,
+                                normals[faces[g][f].vn2 - 1].z);
+                    glVertex3f(vertices[faces[g][f].v2 - 1].x,
+                                vertices[faces[g][f].v2 - 1].y,
+                                vertices[faces[g][f].v2 - 1].z);
+                    glNormal3f(normals[faces[g][f].vn3 - 1].x,
+                                normals[faces[g][f].vn3 - 1].y,
+                                normals[faces[g][f].vn3 - 1].z);
+                    glVertex3f(vertices[faces[g][f].v3 - 1].x,
+                                vertices[faces[g][f].v3 - 1].y,
+                                vertices[faces[g][f].v3 - 1].z);
+                }
+                glEnd();
+            }
+        }
 };
-
-WFObject::WFObject()
-{
-	materialIndex = -1;     // Material index starts from zero
-}
-
-WFObject::~WFObject()
-{
-
-}
-
-int WFObject::load(char *filename)
-{
-	fstream objFile;
-	objFile.open(filename);
-
-	if(objFile.is_open())
-	{
-		char line[255];
-
-		// Parse object file line by line
-		while(objFile.good())
-		{
-			objFile.getline(line, 255);
-			parseLine(line);
-		}
-
-		objFile.close();
-	}
-	else
-	{
-		cout << "Could not open WFObject file '" << filename << "'\n";
-		return false;
-	}
-
-	return true;
-}
-
-void WFObject::parseLine(char *line)
-{
-	//char *lineType;
-
-	// Copy type string to type char[] for strtok()
-
-	//lineType = strtok(lineStr, " ");
-	if(!strlen(line))
-	{
-		return;
-	}
-
-	char *lineType;
-	lineType = strtok(strdup(line), " ");
-
-	// Decide what to do
-	if(!strcmp(lineType, "v"))      // Vertex
-	{
-		parseVertex(line);
-	}
-	else if(!strcmp(lineType, "vn"))    // Normal
-	{
-		parseNormal(line);
-	}
-	else if(!strcmp(lineType, "f")) // Face
-	{
-		parseFace(line);
-	}
-	else if(!strcmp(lineType, "mtllib"))        // Material library (file)
-	{
-		char fileName[255];
-
-		sscanf(line, "mtllib %s", &fileName);
-
-		if(strlen(fileName))
-		{
-			loadMaterials(fileName);
-		}
-		else
-		{
-			cout << "Parse error" << endl;
-		}
-	}
-	else if(!strcmp(lineType, "usemtl"))        // Use a material from the materials library
-	{
-		string mtlName;
-
-		materialIndex++;
-
-		sscanf(line, "usemtl %s", mtlName.c_str());
-
-		parseMaterial(mtlName.c_str());
-
-		faces.push_back(vector<Face>());
-	}
-
-	return;
-}
-
-// Draw object
-void WFObject::draw()
-{
-	for(int g = 0; g < faces.size(); g++)
-	{
-		// Apply material for this material group
-		glMaterialfv(GL_FRONT, GL_SPECULAR, materials[g].Ks);
-		glMaterialfv(GL_FRONT, GL_DIFFUSE, materials[g].Kd);
-		glMaterialfv(GL_FRONT, GL_AMBIENT, materials[g].Ka);
-		glMaterialf(GL_FRONT, GL_SHININESS, materials[g].Ns);
-
-		glBegin(GL_TRIANGLES);
-
-		for(int f = 0; f < faces[g].size(); f++)
-		{
-			glNormal3f(normals[faces[g][f].vn1 - 1].x, normals[faces[g][f].vn1 - 1].y, normals[faces[g][f].vn1 - 1].z);
-			glVertex3f(vertices[faces[g][f].v1 - 1].x, vertices[faces[g][f].v1 - 1].y, vertices[faces[g][f].v1 - 1].z);
-
-			glNormal3f(normals[faces[g][f].vn2 - 1].x, normals[faces[g][f].vn2 - 1].y, normals[faces[g][f].vn2 - 1].z);
-			glVertex3f(vertices[faces[g][f].v2 - 1].x, vertices[faces[g][f].v2 - 1].y, vertices[faces[g][f].v2 - 1].z);
-
-			glNormal3f(normals[faces[g][f].vn3 - 1].x, normals[faces[g][f].vn3 - 1].y, normals[faces[g][f].vn3 - 1].z);
-			glVertex3f(vertices[faces[g][f].v3 - 1].x, vertices[faces[g][f].v3 - 1].y, vertices[faces[g][f].v3 - 1].z);
-		}
-
-		glEnd();
-	}
-}
-
-void WFObject::parseVertex(char *line)
-{
-	vertices.push_back(Vector());       // Add a new element to the vertices array
-
-	sscanf(line, "v %f %f %f", &vertices.back().x, &vertices.back().y, &vertices.back().z);
-
-	return;
-}
-
-// Parse a "vn" normal line of the file into the normals array
-void WFObject::parseNormal(char *line)
-{
-	normals.push_back(Vector());
-
-	sscanf(line, "vn %f %f %f", &normals.back().x, &normals.back().y, &normals.back().z);
-
-	return;
-}
-
-
-// Parse a "f" face line into the faces array. This gets complex due to there being different line formats.
-void WFObject::parseFace(char *line)
-{
-	//Face tmp; // Temporary storage for our face
-	faces[materialIndex].push_back(Face());
-
-	// Read face line. If texture indicies aren't present, don't read them.
-	if(sscanf(line, "f %d//%d %d//%d %d//%d", &faces[materialIndex].back().v1,
-											  &faces[materialIndex].back().vn1,
-											  &faces[materialIndex].back().v2,
-											  &faces[materialIndex].back().vn2,
-											  &faces[materialIndex].back().v3,
-											  &faces[materialIndex].back().vn3) <= 1)
-	{
-		sscanf(line, "f %d/%d/%d %d/%d/%d %d/%d/%d", &faces[materialIndex].back().v1,
-													 &faces[materialIndex].back().vt1,
-													 &faces[materialIndex].back().vn1,
-													 &faces[materialIndex].back().v2,
-													 &faces[materialIndex].back().vt2,
-													 &faces[materialIndex].back().vn2,
-													 &faces[materialIndex].back().v3,
-													 &faces[materialIndex].back().vt3,
-													 &faces[materialIndex].back().vn3);
-	}
-
-	return;
-}
-
-// Open .mtl file and save into memory
-int WFObject::loadMaterials(char *filename)
-{
-	char filePath[255];
-	fstream file;
-
-	file.open(filename);
-
-	if(file.is_open())
-	{
-		char line[255];
-
-		// Parse material file
-		while(file.good())
-		{
-			file.getline(line, 255);
-
-			mtlFile.push_back(line);
-		}
-	}
-	else
-	{
-		cout << "Could not open mtl file '" << filename << "'\n";
-		return false;
-	}
-
-	file.close();
-
-	return true;
-}
-
-// Search .mtl file in memory for the material we want. Load that materials properties into the materials
-// array.
-void WFObject::parseMaterial(string mtlName)
-{
-	string materialName;
-	char *line = new char[255];
-	bool mtlFound = false;
-
-	for(int i = 0; i < mtlFile.size(); i++)
-	{
-		strncpy(line, mtlFile[i].c_str(), 255);
-
-		if(strlen(line))
-		{
-			if(sscanf(line, "newmtl %s", materialName.c_str()))
-			{
-				if(mtlFound)
-				{
-					return;
-				}
-
-				if(!strcmp(mtlName.c_str(), materialName.c_str()))
-				{
-					mtlFound = true;    // Set the "found material" flag to true
-					materials.push_back(Material());
-				}
-			}
-
-			if(mtlFound)
-			{
-				// Parse this line into a material
-				if(line[0] == 'N' && line[1] == 's')
-				{
-					sscanf(line, "Ns %f", &materials.back().Ns);
-				}
-				else if(line[0] == 'K' && line[1] == 'a')
-				{
-					sscanf(line, "Ka %f %f %f", &materials.back().Ka[0], &materials.back().Ka[1], &materials.back().Ka[2]);
-				}
-				else if(line[0] == 'K' && line[1] == 'd')
-				{
-					sscanf(line, "Kd %f %f %f", &materials.back().Kd[0], &materials.back().Kd[1], &materials.back().Kd[2]);
-				}
-				else if(line[0] == 'K' && line[1] == 's')
-				{
-					sscanf(line, "Ks %f %f %f", &materials.back().Ks[0], &materials.back().Ks[1], &materials.back().Ks[2]);
-				}
-			}
-		}
-		else
-		{
-			return;
-		}
-	}
-
-	return;
-}
-
 
 class Math{
 	public:
-		static const float PI = 3.1415926f;
-		static const float HALF_PI =  3.1415926f / 2.0f;
-		static const float EPSILON = 1e-6f;
+		static const float PI;
+		static const float HALF_PI;
+		static const float EPSILON;
 
 		static bool closeEnough(float f1, float f2) {
 			return fabs((f1-f2) / ((f2 == 0.0f) ? 1.0f :f2)) < EPSILON;
@@ -441,9 +392,25 @@ class Math{
 			return (radians * 180.0f) / PI;
 		}
 };
+const float Math::PI = 3.1415926f;
+const float Math::HALF_PI =  3.1415926f / 2.0f;
+const float Math::EPSILON = 1e-6f;
 
-class Vector3
-{
+class Vector4{
+    public:
+        float x,y,z,w;
+
+        Vector4(){}
+        Vector4(float x_, float y_, float z_, float w_) :
+            x(x_), y(y_), z(z_), w(w_) {}
+        ~Vector4(){}
+
+        void set(float x_, float y_, float z_, float w_) {
+            x = x_, y = y_, z = z_; w = w_;
+        }
+};
+
+class Vector3{
 	friend Vector3 operator*(float lhs, const Vector3 &rhs){
 		return Vector3(lhs * rhs.x, lhs * rhs.y, lhs * rhs.z);
 	}
@@ -549,8 +516,7 @@ class Vector3
 		}
 };
 
-class Matrix4
-{
+class Matrix4{
 	friend Vector3 operator*(const Vector3 &lhs, const Matrix4 &rhs) {
 		return Vector3((lhs.x * rhs.mtx[0][0]) + (lhs.y * rhs.mtx[1][0]) + (lhs.z * rhs.mtx[2][0]),
 			(lhs.x * rhs.mtx[0][1]) + (lhs.y * rhs.mtx[1][1]) + (lhs.z * rhs.mtx[2][1]),
@@ -1339,82 +1305,183 @@ const Vector3 Camera::WORLD_XAXIS(1.0f, 0.0f, 0.0f);
 const Vector3 Camera::WORLD_YAXIS(0.0f, 1.0f, 0.0f);
 const Vector3 Camera::WORLD_ZAXIS(0.0f, 0.0f, 1.0f);
 
-class Person{
-public:
-	Person(){
-		position.set(0.0, 0.0, 0.0);
-		xAxis.set(1,0,0);
-		yAxis.set(0,1,0);
-		zAxis.set(0,0,1);
-		orientation.identity();
+class Person {
+    public:
+    	Person(){
+    		position.set(0.0, 0.0, 0.0);
+    		xAxis.set(1,0,0);
+    		yAxis.set(0,1,0);
+    		zAxis.set(0,0,1);
+    		orientation.identity();
 
-		model = WFObject();
+    		model = WFObject();
 
-		if(!model.load("person.obj"))
-		{
-			cout << "Could not load model" << endl;
-		}
-	}
+    		if(!model.load("person.obj"))
+    		{
+    			cout << "Could not load model" << endl;
+    		}
+    	}
 
-	~Person(){
+    	~Person(){}
 
-	}
+    	void draw(void) {
+    		glPushMatrix();
 
-	void draw(void) {
-		glPushMatrix();
+    		Vector3 axis;
+    		float degrees;
 
-		Vector3 axis;
-		float degrees;
+    		orientation.toAxisAngle(axis, degrees);
+    		glTranslatef(position.x, position.y, position.z);
+    		glRotatef(degrees, axis.x, axis.y, axis.z);
+    		model.draw();
+    		glPopMatrix();
+    	}
 
-		orientation.toAxisAngle(axis, degrees);
-		glTranslatef(position.x, position.y, position.z);
-		glRotatef(degrees, axis.x, axis.y, axis.z);
-		model.draw();
-		glPopMatrix();
-	}
+    	void move(Vector3 dist){
+    		Quaternion result = orientation.conjugate() *
+    							Quaternion(0.0, dist.x, dist.y, dist.z) *
+    							orientation;
+    		position += Vector3(result.x, result.y, result.z);
+    	}
 
-	void move(Vector3 dist){
-		Quaternion result = orientation.conjugate() *
-							Quaternion(0.0, dist.x, dist.y, dist.z) *
-							orientation;
-		position += Vector3(result.x, result.y, result.z);
-	}
+    	void movex(float dist) {
+    		move(Vector3(dist, 0, 0));
+    	}
 
-	void movex(float dist) {
-		move(Vector3(dist, 0, 0));
-	}
+    	void movey(float dist) {
+    		move(Vector3(0, dist, 0));
+    	}
 
-	void movey(float dist) {
-		move(Vector3(0, dist, 0));
-	}
+    	void movez(float dist) {
+    		move(Vector3(0, 0, dist));
+    	}
 
-	void movez(float dist) {
-		move(Vector3(0, 0, dist));
-	}
+    	void rotatez(float angle) {
+    		Quaternion nrot(Vector3(0.0, 1.0, 0.0), angle);
+    		orientation = nrot * orientation;
+    	}
 
-	void rotatez(float angle) {
-		Quaternion nrot(Vector3(0.0, 1.0, 0.0), angle);
-		orientation = nrot * orientation;
-	}
+    	const Vector3 &getPosition() const {
+    		return position;
+    	}
 
-	const Vector3 &getPosition() const {
-		return position;
-	}
+    	const Quaternion &getOrientation() const {
+    		return orientation;
+    	}
 
-	const Quaternion &getOrientation() const {
-		return orientation;
-	}
-
-private:
-	Vector3 position;
-	Vector3 xAxis;
-	Vector3 yAxis;
-	Vector3 zAxis;
-	Quaternion orientation;
-	WFObject model;
+    private:
+    	Vector3 position;
+    	Vector3 xAxis;
+    	Vector3 yAxis;
+    	Vector3 zAxis;
+    	Quaternion orientation;
+    	WFObject model;
 };
 
+class Light {
+public:
+    Light(void) {
+        if (nextLightNum < GL_MAX_LIGHTS)
+        {
+            lightNumber = GL_LIGHT0 + nextLightNum;
+            nextLightNum++;
+        }
+        else
+        {
+            cerr << "Warning: maximum number of lights exceeded";
+            lightNumber = GL_LIGHT0 + GL_MAX_LIGHTS - 1;
+        }
+        ambient.set(0,0,0,1);
+        diffuse.set(1,1,1,1);
+        specular.set(1,1,1,1);
+        position_.set(0,0,1,0);
+        attenuationConstant = 1;
+        attenuationLinear = 0;
+        attenuationQuadratic = 0;
+        spotDirection.set(0,0,-1);
+        spotCutoff = 180;
+        spotExponent = 0;
+    }
+    ~Light() {}
 
+    void apply(void);
+
+    void enable(void) {
+        glEnable(lightNumber);
+    }
+
+    void disable(void) {
+        glDisable(lightNumber);
+    }
+
+    void setAmbient( const Vector4& color) {
+        ambient = color;
+    }
+
+    void setDiffuse( const Vector4& color) {
+        diffuse = color;
+    }
+
+    void setSpecular( const Vector4& color) {
+        specular = color;
+    }
+
+    void setPosition( const Vector4& position ){
+        position_ = position;
+    }
+
+    void setPosition(GLfloat x, GLfloat y, GLfloat z, GLfloat w) {
+        position_.set(x,y,z,w);
+    }
+
+    void setInfinitePosition(const Vector3& position)
+    {
+        setPosition(position.x, position.y, position.z, 0);
+    }
+
+    void setInfinitePosition( GLfloat x, GLfloat y, GLfloat z ) {
+        setPosition(x,y,z,0);
+    }
+
+    void setLocalPosition(const Vector3& position) {
+        setPosition(position.x, position.y, position.z, 1);
+    }
+
+    void setLocalPosition( GLfloat x, GLfloat y, GLfloat z) {
+        setPosition(x,y,z,1);
+    }
+
+    void setAttenuation(GLfloat constant, GLfloat linear, GLfloat quadratic) {
+        attenuationConstant = constant;
+        attenuationLinear = linear;
+        attenuationQuadratic = quadratic;
+    }
+
+    void setSpotDirection(const Vector3& direction) {
+        spotDirection = direction;
+    }
+
+    void setSpotCutoff(GLfloat cutoff) {
+        spotCutoff = cutoff;
+    }
+
+    void setSpotExponent(GLfloat exponent) {
+        spotExponent = exponent;
+    }
+
+private:
+    GLenum lightNumber;
+    Vector4 ambient, specular, diffuse;
+    Vector4 position_;
+    GLfloat attenuationConstant,
+            attenuationLinear,
+            attenuationQuadratic;
+    Vector3 spotDirection;
+    GLfloat spotCutoff, spotExponent;
+    static int nextLightNum;
+};
+
+int Light::nextLightNum = 0;
 
 GLint window_width = 800;
 GLint window_height = 800;
@@ -1423,6 +1490,10 @@ Camera camera;
 Person person;
 WFObject ground;
 WFObject shelby;
+
+enum LightingType { SPOT, POSITIONAL, BOTH, NONE };
+
+LightingType lt = SPOT;
 
 void display() {
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -1484,25 +1555,15 @@ void setup(GLsizei w, GLsizei h) {
 
 	glMatrixMode(GL_MODELVIEW);
 
-	GLfloat LightAmbient[]  = {0.5f, 0.5f, 0.5f, 1.0f};
-	GLfloat LightDiffuse[]  = {1.0f, 1.0f, 1.0f, 1.0f};
-	GLfloat LightPosition[] = {0.0f, 0.0f, 2.0f, 1.0f};
-
 	glEnable(GL_LIGHTING);
-	glEnable(GL_LIGHT0);
 
-	glLightfv(GL_LIGHT1, GL_AMBIENT, LightAmbient);
-	glEnable(GL_LIGHT1);
+    glEnable(GL_LIGHT0);
+
 
 	if(!ground.load("ground.obj"))
-	{
 		cout << "Could not load model ground.obj" << endl;
-	}
-
 	if(!shelby.load("shelbyb.obj"))
 		cout << "Could not load shelby.obj" << endl;
-
-
 }
 
 void resize(GLsizei w, GLsizei h) {
@@ -1540,6 +1601,8 @@ void onKeyboardPress(unsigned char key, int x, int y) {
 		case 115: //s
 			movement.set(-1, 0, 0);
 			break;
+        case 108: //l
+
 		default:
 			printf("    Keyboard %c == %d", key, key);
 			break;

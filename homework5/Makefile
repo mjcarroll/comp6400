@@ -6,7 +6,7 @@ install:
 uninstall:
 	cd build && make uninstall
 
-homework4:
+homework5:
 	@mkdir -p build
 	-mkdir -p bin
 	cd build && cmake $(CMAKE_FLAGS) ..
