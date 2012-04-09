@@ -3,6 +3,25 @@
  * Michael Carroll <carromj@auburn.edu>
  */
 
+ /* 
+    Solution
+    ========
+
+    NOTE: OBJ FILES MUST BE IN SAME FOLDER TO WORK.
+
+    This implementation features an obj file loader, and a quaternion camera.  
+    It also uses lighting and material properties for all materials.
+
+    Use W and S to move character forwards and backwards
+    Use A and D to rotate character left and right.
+
+    Use mouse click and drag to orbit around character, position with track even when character moves.
+    Use mouse scroll up and down (or keyboard up and down) to "dolly" in on character.
+
+    ESC exits.
+
+*/
+
  /*
     Requirements
     ============
@@ -42,7 +61,6 @@
     source code.  Place the comments, in the beginning of your code.
 
 */
-
 
 // Windows specific
 #ifdef WIN32
@@ -1123,7 +1141,7 @@ class Camera{
             zfar = DEFAULT_ZFAR;
 
             minRadius = 2.5;
-            maxRadius = 30;
+            maxRadius = 300;
 
             position.set(0.0, 0.0, 0.0);
             target.set(0.0, 0.0, 0.0);
@@ -1340,7 +1358,7 @@ public:
         
         model = WFObject();
 
-        if(!model.load("monkey.obj"))
+        if(!model.load("person.obj"))
         {
             cout << "Could not load model" << endl;
         }
@@ -1352,7 +1370,13 @@ public:
 
     void draw(void) {
         glPushMatrix();
+
+        Vector3 axis;
+        float degrees;
+
+        orientation.toAxisAngle(axis, degrees);
         glTranslatef(position.x, position.y, position.z);
+        glRotatef(degrees, axis.x, axis.y, axis.z);
         model.draw();
         glPopMatrix();
     }
@@ -1376,9 +1400,9 @@ public:
         move(Vector3(0, 0, dist));
     }
 
-    void rotatex(float angle) {
-        Quaternion nrot(Vector3(1.0, 0.0, 0.0), angle);
-        orientation *= nrot;
+    void rotatez(float angle) {
+        Quaternion nrot(Vector3(0.0, 1.0, 0.0), angle);
+        orientation = nrot * orientation;
     }
 
     const Vector3 &getPosition() const {
@@ -1398,18 +1422,6 @@ private:
     WFObject model;
 };
 
-class Shelby{
-    public:
-        Shelby(){
-
-        }
-
-        ~Shelby(){
-
-        }
-    private:
-};
-
 
 
 GLint window_width = 800;
@@ -1418,6 +1430,7 @@ GLint window_height = 800;
 Camera camera;
 Person person;
 WFObject ground;
+WFObject shelby;
 
 void display() {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -1430,14 +1443,31 @@ void display() {
     glLoadMatrixf(&camera.getViewMatrix()[0][0]);
 
     glPushMatrix();
-    glScalef(40, 1, 40);
+    glScalef(400, 1, 400);
     ground.draw();
     glPopMatrix();
 
+    glPushMatrix();
+    glTranslatef(-150, 0, -100);
+    shelby.draw();
+    glPopMatrix();
+
+    glPushMatrix();
+    glTranslatef(100, 0, 100);
+    shelby.draw();
+    glPopMatrix();
+
+    glPushMatrix();
+    glTranslatef(100, 0, -100);
+    shelby.draw();
+    glPopMatrix();
+
+    glPushMatrix();
+    glTranslatef(-150, 0, 100);
+    shelby.draw();
+    glPopMatrix();
+    
     person.draw();
-
-
-
     glutSwapBuffers();
 }
 
@@ -1474,8 +1504,12 @@ void setup(GLsizei w, GLsizei h) {
 
     if(!ground.load("ground.obj"))
     {
-        cout << "Could not load model" << endl;
+        cout << "Could not load model ground.obj" << endl;
     }
+
+    if(!shelby.load("shelbyb.obj"))
+        cout << "Could not load shelby.obj" << endl;
+
 
 }
 
@@ -1503,14 +1537,16 @@ void onKeyboardPress(unsigned char key, int x, int y) {
         case 27:
             exit(0);
         case 97: //a
+            person.rotatez(2);
             break;
         case 100: //d
+            person.rotatez(-2);
             break;
         case 119: //w
-            movement.set(0.1, 0, 0);
+            movement.set(1, 0, 0);
             break;
         case 115: //s
-            movement.set(-0.1, 0, 0);
+            movement.set(-1, 0, 0);
             break;
         default:
             printf("    Keyboard %c == %d", key, key);
