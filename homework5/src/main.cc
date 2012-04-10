@@ -400,14 +400,33 @@ class Vector4{
     public:
         float x,y,z,w;
 
-        Vector4(){}
-        Vector4(float x_, float y_, float z_, float w_) :
-            x(x_), y(y_), z(z_), w(w_) {}
+        GLfloat vec[4];
+
+        Vector4(void){
+            set(0, 0, 0, 0);
+        }
+
+        Vector4(GLfloat x, GLfloat y, GLfloat z, GLfloat w) {
+            set(x, y, z, w);
+        }
+
+        Vector4(const GLfloat *v) {
+            set(v[0], v[1], v[2], v[3]);
+        }
+
+        Vector4(const Vector4 &v) {
+            set(v.vec[0], v.vec[1], v.vec[2], v.vec[3]);
+        }
+
         ~Vector4(){}
 
-        void set(float x_, float y_, float z_, float w_) {
-            x = x_, y = y_, z = z_; w = w_;
+        void set(GLfloat x, GLfloat y, GLfloat z, GLfloat w) {
+            vec[0] = x;
+            vec[1] = y;
+            vec[2] = z;
+            vec[3] = w;
         }
+
 };
 
 class Vector3{
@@ -1398,13 +1417,27 @@ public:
         attenuationConstant = 1;
         attenuationLinear = 0;
         attenuationQuadratic = 0;
-        spotDirection.set(0,0,-1);
+        spotDirection.set(0,0,-1, 0);
         spotCutoff = 180;
         spotExponent = 0;
     }
     ~Light() {}
 
-    void apply(void);
+    void apply(void){
+        glEnable(lightNumber);
+        glLightfv(lightNumber, GL_POSITION, position_.vec);
+        glLightfv(lightNumber, GL_AMBIENT, ambient.vec);
+        glLightfv(lightNumber, GL_DIFFUSE, diffuse.vec);
+        glLightfv(lightNumber, GL_SPECULAR, specular.vec);
+        glLightf(lightNumber, GL_CONSTANT_ATTENUATION, attenuationConstant);
+        glLightf(lightNumber, GL_LINEAR_ATTENUATION, attenuationLinear);
+        glLightf(lightNumber, GL_QUADRATIC_ATTENUATION, attenuationQuadratic);
+        glLightf(lightNumber, GL_SPOT_CUTOFF, spotCutoff);
+        if (spotCutoff < 180) {
+            glLightfv(lightNumber, GL_SPOT_DIRECTION, spotDirection.vec);
+            glLightf(lightNumber, GL_SPOT_EXPONENT, spotExponent);
+        }
+    }
 
     void enable(void) {
         glEnable(lightNumber);
@@ -1458,7 +1491,9 @@ public:
     }
 
     void setSpotDirection(const Vector3& direction) {
-        spotDirection = direction;
+        spotDirection.vec[0] = direction.x;
+        spotDirection.vec[1] = direction.y;
+        spotDirection.vec[2] = direction.z;
     }
 
     void setSpotCutoff(GLfloat cutoff) {
@@ -1476,7 +1511,7 @@ private:
     GLfloat attenuationConstant,
             attenuationLinear,
             attenuationQuadratic;
-    Vector3 spotDirection;
+    Vector4 spotDirection;
     GLfloat spotCutoff, spotExponent;
     static int nextLightNum;
 };
@@ -1488,6 +1523,7 @@ GLint window_height = 800;
 
 Camera camera;
 Person person;
+Light light0, spot_light, positional_light;
 WFObject ground;
 WFObject shelby;
 
@@ -1504,6 +1540,7 @@ void display() {
 
 	glMatrixMode(GL_MODELVIEW);
 	glLoadMatrixf(&camera.getViewMatrix()[0][0]);
+
 
 	glPushMatrix();
 	glScalef(400, 1, 400);
@@ -1530,6 +1567,8 @@ void display() {
 	shelby.draw();
 	glPopMatrix();
 
+
+
 	person.draw();
 	glutSwapBuffers();
 }
@@ -1544,6 +1583,7 @@ void setup(GLsizei w, GLsizei h) {
 	glEnable(GL_CULL_FACE);
 	glCullFace(GL_BACK);
 	glEnable(GL_DEPTH_TEST);
+    glEnable(GL_COLOR);
 
 	camera.perspective(Camera::DEFAULT_FOVX,
 					   static_cast<float>(w) / static_cast<float>(h),
@@ -1556,9 +1596,15 @@ void setup(GLsizei w, GLsizei h) {
 	glMatrixMode(GL_MODELVIEW);
 
 	glEnable(GL_LIGHTING);
+    Vector4 global_ambient = Vector4(0.2, 0.2, 0, 1.0);
+    glLightModelfv(GL_LIGHT_MODEL_AMBIENT, global_ambient.vec);
+    glLightModeli(GL_LIGHT_MODEL_TWO_SIDE, GL_TRUE);
 
-    glEnable(GL_LIGHT0);
-
+    light0.setPosition(Vector4(10, 10, 10, 0));
+    light0.setAmbient(Vector4(0,0,0,1));
+    light0.setDiffuse(Vector4(1,1,1,1));
+    light0.setSpecular(Vector4(1,1,1,1));
+    light0.apply();
 
 	if(!ground.load("ground.obj"))
 		cout << "Could not load model ground.obj" << endl;
@@ -1670,7 +1716,7 @@ void onActiveMouseMotion(int x, int y) {
 
 int main(int argc, char *argv[]) {
 	glutInit(&argc, argv);
-	glutInitDisplayMode(GLUT_RGB | GLUT_DEPTH | GLUT_DOUBLE);
+	glutInitDisplayMode(GLUT_RGBA | GLUT_DEPTH | GLUT_DOUBLE);
 	glutInitWindowSize(window_width, window_height);
 	glutCreateWindow("COMP-5/6400 Assignment 5");
 
